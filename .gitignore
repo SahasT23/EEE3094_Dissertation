@@ -9,6 +9,8 @@
 *.tmp
 *Code/
 
+# Should not be able to see the Code directory
+
 # Ignore LaTeX build files everywhere
 *.aux
 *.log
