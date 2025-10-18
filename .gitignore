@@ -4,6 +4,9 @@
 *.pyo
 *.vscode/
 *.idea/
+*JSON/
+*logs/
+*.tmp
 
 # Ignore LaTeX build files everywhere
 *.aux
