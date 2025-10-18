@@ -7,6 +7,7 @@
 *JSON/
 *logs/
 *.tmp
+*Code/
 
 # Ignore LaTeX build files everywhere
 *.aux
