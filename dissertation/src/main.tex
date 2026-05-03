@@ -2,6 +2,8 @@
 
 \input{header}
 
+\newtheorem{definition}{Definition}
+
 \begin{document}
 %----------------------------------------------------------------------------------------
 %	TITLE+
@@ -11,7 +13,7 @@
     \centering
     \vspace*{2cm}
     \Huge{\textbf{EEE3094 Technical Report}}\\[0.5cm]
-    \Large{\textbf{Semester 1 Report}}\\ 
+    \Large{\textbf{}}\\ 
     \Large{Sahas Talasila \textit{230057896}}
     \vfill
 \end{titlepage}
@@ -25,238 +27,438 @@
 \end{abstract}
 
 \section{Introduction}
-The Introduction should answer three basic questions:
 
-What is the project about?
-This section should be a precise description of the subject matter of the
-report. It should also include the way it relates to other work in the School, if this is appropriate.
+\section{Literature Review and Motivation}
 
-Why is it being undertaken?
-The reasons for undertaking the project are discussed in this section,
-outlining the objectives and importance of the work. Since it is
-important not to create a false impression of the outcome of the
-project a brief statement is made regarding whether or not the aims of
-the project were achieved, and, if not, why not.
+\subsection{Time Series Feature Extraction}
+\label{sec:lit-feature-extraction}
 
-How is the subject matter of the project described? – This should be a
-`Road-Map' of the dissertation. This is a `Road-Map' of the dissertation and comprises a short summary
-of the contents of the subsequent sections. It informs the reader where, for example, the methods used, results
-obtained, etc. are to be found.
+Raw time series are high-dimensional, temporally correlated, and often noisy. Although models can ingest sequences directly, feature preprocessing usually improves accuracy and efficiency. The preprocessing choice determines which information is preserved.
 
-\section{Literature Review}
+Spectral methods project signals into the frequency domain. The fast Fourier transform decomposes signals into sinusoidal components and reveals dominant periodicities. Recent work combines FFT amplitude and phase features with LSTMs to leverage time- and frequency-domain information [FFTLSTM]. Transformer variants using FFT-based preprocessing improve forecasting across sensor datasets by enriching representations with spectral structure [TSFNetFFT]. Wavelet and modal methods provide joint time-frequency localisation. MDCNet uses variational mode decomposition to separate trend and modal components and achieves strong long-horizon performance [MDCNet]. These approaches characterise frequency content or scale-specific energy but do not encode structural relationships between temporal events.
 
-The Literature Review defines the current state of research in your area and
-places your work in context with other work in your project area. It also acts
-as the foundation for the comparison of your results with other relevant work
-in the `Discussion' chapter in your Individual Project.
+Statistical feature extraction remains in the time domain. Toolkits such as \textit{hctsa} compute large collections of scalar summaries including distributional statistics, autocorrelation measures, and entropy estimates [catch22]. Deep learning models instead learn representations end-to-end from raw sequences. Recurrent and convolutional architectures capture temporal dependencies without manual feature design. THATSN builds a temporal hierarchical tree from multi-cyclic decompositions and aggregates features using a gated LSTM to capture inter-cycle relationships [THATSN]. Despite strong predictive performance, these learned representations are typically opaque.
 
-The review is a summary of relevant articles (that is, material relevant to the
-background to your project, overview of the subject, discussion of any
-essential theories, etc.) published in technical journals, conference
-proceedings, books, websites, etc. - avoid using very general references. The
-majority of references should be books or journal papers; web sites should appear only occasionally in the list.
+Across both paradigms, the mapping from raw signal to feature is rarely transparent. Spectral coefficients, statistical summaries, and learned embeddings may support accurate predictions, but they do not provide a clear link between predictions and specific events in the input signal.
 
-Most journals have `Special Issues' on given topic areas. These are good sources of review material and contain large numbers of references.
+\subsection{Visibility Graphs for Time Series}
+\label{sec:lit-visibility-graphs}
 
-However, do not cite a reference unless you have read it. Furthermore, a Literature Review which only cites Stage I and II lecture notes and text
-books is not considered to be adequate.
+Visibility graphs map geometric relationships in time series to graphs: two points connect if no intermediate point blocks their line of sight [NetworkStructureLacasa]. This preserves temporal ordering and reflects underlying dynamics, since degree distributions distinguish periodic, random, and fractal processes [NetworkStructureLacasa]. Extensions include multiplex visibility graphs, where each channel forms a layer and inter-layer edges capture cross-variable dependencies [multiplex\_visibility\_Lacasa]. Broader overviews cover classification, clustering, and motif discovery [VGforTSBook], while applications to financial and synthetic data demonstrate extraction of short- and long-term structure [VisibilityGraphBasedTSA].
 
-It is imperative to attribute any information cited in the report to the source from which it was obtained - failure to reference material properly
-could result in plagiarism.
+Standard visibility graphs still have structural limitations. They are undirected, contain cycles, and lack a canonical traversal order. Systematic decomposition into interpretable substructures becomes computationally difficult. As a result, they are limited as preprocessing for machine learning. Graph-level statistics such as degree distribution or clustering coefficient can be used as features, but they cannot be linked to specific events in the original signal.
 
-The list of references should be provided in the same format as in IEEE Transactions or IET Proceedings.
+\subsection{Path Signatures in Machine Learning}
+\label{sec:lit-signatures}
+
+The signature transform, rooted in rough path theory, maps a sequential path to a graded sequence of iterated integrals that uniquely characterises it up to reparametrisation [GeneralisedSignaturesPaper]. Linear functionals on signature terms are dense in the space of continuous functions on paths, providing a universal nonlinear feature map. The output dimensionality depends only on the embedding dimension and truncation depth, not solely on input length, a property well-suited to variable-length sequences.
+
+A generalised signature framework has been developed and benchmarked across 26 multivariate classification tasks, achieving performance comparable to deep recurrent and convolutional architectures [GeneralisedSignaturesPaper]. Applications span handwriting recognition, medical time series, and financial modelling. However, existing work applies signatures to raw or augmented time series. No prior method computes signatures over structurally decomposed paths derived from a graph-based representation of the signal.
+
+\subsection{Statistical Feature Selection}
+\label{sec:lit-catch22}
+
+The catch22 feature set distils 4,791 time series characteristics from the \textit{hctsa} library down to 22 canonical features via greedy forward selection across 93 classification benchmarks [catch22]. The retained features span distributional, autocorrelation, successive-difference, and fluctuation-scaling categories, achieving comparable classification accuracy to the full library at a fraction of the computational cost ($O(N^{1.16})$). The selection criterion maximises diversity: each feature captures a distinct dynamical property, minimising inter-feature redundancy.
+
+catch22 features are individually named and interpretable in a statistical sense, but they lack structural provenance. A given feature value quantifies \emph{what} property the signal exhibits — it does not identify \emph{where} in the signal or \emph{which} temporal events produced it.
+
+\subsection{The Interpretability Gap}
+\label{sec:lit-gap}
+
+The methods surveyed above share a common structural deficiency: the chain of reasoning from raw signal to extracted feature to model prediction is opaque. FFT projects into the frequency domain, discarding temporal locality. Wavelet decomposition retains time-frequency resolution but commits to a fixed basis, and individual coefficients do not correspond to identifiable signal events. catch22 computes named statistical summaries, yet no summary traces to a specific temporal structure. Standard visibility graphs encode pairwise geometric relationships but lack the directed, acyclic structure required for systematic decomposition. Deep learning methods learn representations end-to-end with no human-readable intermediate stage.
+
+Post-hoc explainability tools such as SHAP can identify \emph{which} features drive a prediction. However, the explanatory value of a SHAP attribution depends entirely on the semantic content of the underlying feature. An attribution to a spectral coefficient or an autocorrelation statistic tells the practitioner that a particular frequency or correlation property mattered — it does not reveal which events in the raw signal produced that property.
+
+This work addresses the gap by proposing a preprocessing method in which every extracted feature possesses full structural provenance. The Magnitude-Ordered Visibility Graph transforms a time series into an acyclic hierarchy admitting polynomial-time decomposition into monotone chains. Path signatures computed over these chains yield fixed-dimensional descriptors, each traceable through a specific chain, through specific graph nodes, to specific timestamps and amplitudes in the original signal. When combined with post-hoc attribution, this provenance enables a complete backtrace: from model prediction, through feature importance, through graph structure, to the raw data.
 
 \section{Theoretical Background}
 
-This section should provide the theoretical background to the project. It should include any relevant equations, derivations, and explanations
-of concepts that are essential for understanding the project.
+It is imperative that the reader understands the limitations of standard visibility graphs and min-max trees. Standard visibility graphs convert a time series into an undirected graph by connecting points that have line-of-sight visibility. Because visibility is symmetric, cycles arise immediately. Any three mutually visible points form a triangle and any clique of size \texttt{k} contains multiple cycles. Consequently, no canonical traversal exists, path enumeration between nodes grows exponentially, and cycle detection is required during feature extraction, making large-scale analysis computationally impractical.
 
-\subsection{Graphs and Time Series Background}
+\begin{large}
+    IMAGE SHOWING A VISIBILITY GRAPH
+\end{large}
 
-Define and ask:
+A more fundamental limitation is the loss of information inherent to time series. Two natural orderings exist: temporal ordering and magnitude ordering. Standard visibility graphs ignore both and treat all edges as equivalent, regardless of whether they connect dominant peaks or minor fluctuations.
 
-\begin{enumerate}
-  \item What is a graph?
-  \item What is a time series?
-  \item Where are time series used?
-  \item What is time series analysis?
-  \item What are the common methods used for time series analysis?
-  \item How can graphs be used for time series analysis?
-  \item Why can graphs be used for time series analysis?  
-  \item What is a visibility graph?
-  \item How can visibility graphs be used for time series analysis?
-  \item Why can visibility graphs be used for time series analysis?
-  \item What are the common methods used for visibility graph analysis?
-  \item What are the limitations of visibility graphs for time series analysis?
-  \item What is a Min-Max Heap?
-  \item How does a Min-Max Heap work?
-  \item What are the common operations of a Min-Max Heap?
-  \item What are the time complexities of the common operations of a Min-Max Heap?
-  \item What are the limitations of a Min-Max Heap?
-  \item What is the MOVG?
-  \item How does the MOVG work?
-  \item How is the MOVG different from a standard visibility graph?
-  \item What are the advantages of the MOVG over a standard visibility graph?
-  \item What does the MOVG take from the Min-Max Heap?
-  \item What are the advantages of the MOVG over a Min-Max Heap?
-  \item How does the MOVG fit into a machine learning pipeline?
-  \item Why is preprocessing important for machine learning?
-  \item What are the advantages of using the MOVG for preprocessing in a machine learning pipeline?
-  \item What are the possible applications of the MOVG?
-\end{enumerate}
+MOVG incorporates both orderings. Magnitude ordering induces a hierarchy in which the global maximum becomes the root and each node selects as parent the nearest visible point with strictly larger amplitude. Temporal ordering preserves directionality so forward and backward traversal differ. These constraints eliminate cycles via monotone value chains: each step moves to a strictly smaller value, preventing return to the starting node. The resulting structure is acyclic and supports polynomial-time decomposition.
 
-\subsection{Visibility Graph Background}
+This representation remains visually interpretable. The tree mirrors the signal, revealing dominance relationships among peaks and troughs and linking extracted features directly to amplitudes and timestamps in the raw data.
 
-\subsection{Visibility Graph Limitations Background}
+\subsection{MOVG Construction}
+\label{sec:movg-construction}
 
-\subsection{Min-Max Heap Background}
+% Need to check if pseudocode counts towards word count.
 
-\subsection{MOVG Background}
+MOVG construction proceeds in two stages: visibility graph construction, then magnitude hierarchy imposition.
 
-\subsection{ML Pipeline and Preprocessing Background}
+\subsubsection{Visibility Condition}
 
-Diagrams to show what the ML model pipeline is and where the MOVG fits in, as well as explaining why preprocessing is important.
+Given a time series $Y = \{y_0, y_1, \ldots, y_{n-1}\}$, points $i$ and $j$ ($i < j$) are mutually visible iff every intermediate point $k$ satisfies:
+
+\begin{equation}
+y_k \leq y_i + (y_j - y_i) \cdot \frac{k - i}{j - i} \quad \forall\; i < k < j
+\label{eq:visibility}
+\end{equation}
+
+Adjacent points ($j = i+1$) are always visible. The visibility graph $G = (V, E)$ adds an edge for each visible pair.
+
+\begin{algorithm}[H]
+\caption{Build Visibility Graph}
+\label{alg:build-vg}
+\begin{algorithmic}[1]
+\Require Time series $Y$ of length $n$
+\Ensure Graph $G = (V, E)$
+\Function{BuildVisibilityGraph}{$Y$}
+    \State $G \gets$ graph with $V = \{0, \ldots, n-1\}$
+    \For{$i \gets 0$ \textbf{to} $n - 2$}
+        \For{$j \gets i + 1$ \textbf{to} $n - 1$}
+            \State $\text{visible} \gets \textbf{true}$
+            \For{$k \gets i+1$ \textbf{to} $j-1$}
+                \If{$Y[k] > Y[i] + (Y[j] - Y[i]) \cdot \frac{k-i}{j-i}$}
+                    \State $\text{visible} \gets \textbf{false}$; \textbf{break}
+                \EndIf
+            \EndFor
+            \If{visible} $G.\text{AddEdge}(i, j)$ \EndIf
+        \EndFor
+    \EndFor
+    \State \Return $G$
+\EndFunction
+\end{algorithmic}
+\end{algorithm}
+
+Worst-case complexity is $O(n^3)$: $O(n^2)$ pairs, each requiring up to $O(n)$ intermediate checks.
+
+\subsubsection{Magnitude Hierarchy}
+
+The visibility graph is undirected and cyclic. The magnitude hierarchy converts it into an acyclic tree. The global maximum becomes the root at depth~0. Each remaining node $i$ is assigned:
+
+\begin{equation}
+\text{parent}(i) = \arg\min_{c \in C_i} Y[c], \quad C_i = \{j : j < i,\; G.\text{hasEdge}(j, i),\; Y[j] > Y[i]\}
+\label{eq:parent-assignment}
+\end{equation}
+
+Selecting the \emph{smallest} larger visible predecessor produces a tight hierarchy: root-level nodes represent dominant peaks; leaf nodes represent minor fluctuations. Depth directly encodes amplitude significance.
+
+\begin{algorithm}[H]
+\caption{Build Magnitude Hierarchy}
+\label{alg:build-hierarchy}
+\begin{algorithmic}[1]
+\Require Time series $Y$, visibility graph $G$
+\Ensure Root, parent map, level map
+\Function{BuildHierarchy}{$Y, G$}
+    \State $\text{root} \gets \arg\max_i Y[i]$; \quad $\text{level}[\text{root}] \gets 0$
+    \For{$i \gets 0$ \textbf{to} $n - 1$, $i \neq \text{root}$}
+        \State $C \gets \{j : j < i \land G.\text{hasEdge}(j, i) \land Y[j] > Y[i]\}$
+        \If{$C \neq \emptyset$}
+            \State $\text{parent}[i] \gets \arg\min_{c \in C} Y[c]$
+            \State $\text{level}[i] \gets \text{level}[\text{parent}[i]] + 1$
+        \EndIf
+    \EndFor
+    \State \Return $(\text{root}, \text{parent}, \text{level})$
+\EndFunction
+\end{algorithmic}
+\end{algorithm}
+
+Hierarchy construction is $O(n^2)$ time, $O(n)$ space. The resulting tree is provably acyclic: any chain through the hierarchy has strictly monotone amplitudes ($v_0 > v_1 > \cdots > v_k$), so returning to $v_0$ would require $v_k > v_0$, a contradiction.
+
+\subsubsection{Worked Example}
+
+Consider the 8-sample time series $Y = [3, 1, 4, 2, 5, 1, 3, 2]$, plotted in Figure~\ref{fig:movg-construction}.
+
+% PLACEHOLDER: You draw the MOVG tree on top of this time series
+% Panel (a): Time series as points at indices 0--7, amplitudes [3, 1, 4, 2, 5, 1, 3, 2]
+% Panel (b): Your MOVG tree overlay — root at index 4 (y=5), parent-child edges
+\begin{figure}[H]
+    \centering
+    % [INSERT YOUR MOVG DRAWING HERE]
+    \caption{MOVG construction on $Y = [3, 1, 4, 2, 5, 1, 3, 2]$. (a)~Raw time series. (b)~Magnitude hierarchy: node~4 ($y{=}5$) is root; parent assignments follow Eq.~\ref{eq:parent-assignment}.}
+    \label{fig:movg-construction}
+\end{figure}
+
+Node~4 ($y{=}5$) is the global maximum and becomes root. Node~2 ($y{=}4$) is its nearest smaller-valued visible predecessor and attaches at depth~1. Nodes~0 and~6 ($y{=}3$) attach at depth~2. The remaining nodes populate deeper levels. The tree directly reflects the amplitude hierarchy of the original signal.
+
+\subsection{Path Decomposition}
+\label{sec:decomposition}
+
+Given a selected query node $s$, the decomposition algorithm enumerates all maximal monotone chains terminating at $s$ via backward traversal through the hierarchy. Two families of chains are recovered: \emph{decreasing chains}, along which amplitudes are strictly monotonically decreasing in forward time ($v_0 > v_1 > \cdots > v_k$), and \emph{increasing chains}, along which they are strictly increasing. These correspond respectively to descents from dominant peaks and ascents toward them.
+
+\subsubsection{Density and Chronological Constraints}
+
+Two admissibility conditions govern chain validity.
+
+\begin{definition}[Chronologically Dense Path]
+\label{def:dense-path}
+A path $X = [n_0, n_1, \ldots, n_k]$ is \emph{chronologically dense} if for every consecutive pair $(n_i, n_{i+1})$, no intermediate node $m$ exists such that (i)~$\min(n_i, n_{i+1}) < m < \max(n_i, n_{i+1})$, (ii)~$m$ is visible from both $n_i$ and $n_{i+1}$, and (iii)~$m$ preserves the monotone trend of the chain.
+\end{definition}
+
+The density constraint prevents the omission of structurally relevant intermediate nodes. A second constraint enforces temporal causality: once the traversal moves backward in time, no subsequent forward jump is permitted.
+
+\subsubsection{Chain Discovery}
+
+Algorithm~\ref{alg:chain-discovery} recovers all maximal decreasing chains via recursive backward search. At each step, the frontier node is extended to all visible predecessors with strictly greater amplitude, subject to density and chronological admissibility. Recursion terminates when no further valid extension exists; chains of length $\geq 2$ are retained. Increasing chains are obtained identically with the magnitude inequality reversed.
+
+\begin{algorithm}[H]
+\caption{Find Maximal Decreasing Chains}
+\label{alg:chain-discovery}
+\begin{algorithmic}[1]
+\Require MOVG structure, query node $s$
+\Ensure Set of maximal decreasing chains ending at $s$
+\Function{FindDecreasingChains}{MOVG, $s$}
+    \State $\mathcal{C} \gets \emptyset$
+    \Procedure{BackwardSearch}{path}
+        \State $f \gets \text{path}[0]$ \Comment{Frontier node}
+        \State $\text{extended} \gets \textbf{false}$
+        \For{$p \in \text{predecessors}(f)$ \textbf{where} $Y[p] > Y[f]$}
+            \If{\Call{IsDense}{$[p] \oplus \text{path}$} $\land$ \Call{IsChronological}{$[p] \oplus \text{path}$}}
+                \State \Call{BackwardSearch}{$[p] \oplus \text{path}$}
+                \State $\text{extended} \gets \textbf{true}$
+            \EndIf
+        \EndFor
+        \If{$\neg\,\text{extended} \land |\text{path}| \geq 2$}
+            \State $\mathcal{C} \gets \mathcal{C} \cup \{\text{path}\}$
+        \EndIf
+    \EndProcedure
+    \State \Call{BackwardSearch}{$[s]$}
+    \State \Return $\mathcal{C}$
+\EndFunction
+\end{algorithmic}
+\end{algorithm}
+
+From each maximal chain, all valid subpaths are generated by progressive truncation of the leading element, retaining only those containing $s$. This yields a comprehensive family of monotone subsequences at varying temporal scales, each anchored at the query node. Complexity is $O(k \cdot n)$ for chain discovery and $O(k \cdot L^2)$ for subpath generation, where $k$ denotes the number of maximal chains and $L$ the mean chain length.
+
+\subsubsection{Worked Example (continued)}
+
+\begin{large}
+    NEED TO REDO THE EXAMPLES AND DO IT MY WAY
+\end{large}
+
+Returning to $Y = [3, 1, 4, 2, 5, 1, 3, 2]$ with query node $s = 7$ ($y{=}2$), the decomposition recovers chains by traversing backward through the hierarchy. A decreasing chain might comprise $[4, 6, 7]$ (amplitudes $5 \to 3 \to 2$), capturing the descent from the global maximum through an intermediate peak to the query point. An increasing chain might comprise $[5, 7]$ (amplitudes $1 \to 2$), capturing a local ascent. Longer chains encode coarser-scale trends; shorter subpaths capture finer local structure. Each chain is directly traceable to specific nodes and timestamps in the original signal.
+
+% PLACEHOLDER: You draw chains overlaid on the toy time series
+% [INSERT FIGURE: same time series, with example decreasing chain [4,6,7] and
+% increasing chain [5,7] highlighted as coloured paths on the signal]
+\begin{figure}[H]
+    \centering
+    % [INSERT YOUR CHAIN DRAWING HERE]
+    \caption{Decomposition at query node $s{=}7$ on $Y = [3, 1, 4, 2, 5, 1, 3, 2]$. Decreasing chain $[4, 6, 7]$ (red) captures descent from global maximum. Increasing chain $[5, 7]$ (blue) captures local ascent.}
+    \label{fig:decomposition-example}
+\end{figure}
+
+\subsection{Path Signatures}
+\label{sec:signatures}
+
+Path signatures, derived from rough path theory, provide a method for reducing variable-length sequential data to fixed-dimensional numerically encodable descriptors via iterated integrals. Applied to the chains produced by MOVG decomposition, they yield, what are essentially, compact geometric ``fingerprints'' that capture trend, curvature, and temporal asymmetry, which are properties no single summary statistic encodes simultaneously.
+
+The decomposition of Section~\ref{sec:decomposition} yields families of monotone chains. To obtain fixed-dimensional numerical descriptors from these variable-length paths, the signature transform from rough path theory is applied. The signature of a path is a graded sequence of iterated integrals that, under mild regularity conditions, characterises the path up to tree-like equivalence and reparametrisation.
+
+\subsubsection{The 1D Degeneracy}
+
+For a univariate path $x = (x_1, \ldots, x_n) \in \mathbb{R}^1$, the depth-$N$ signature collapses to powers of the net increment:
+\begin{equation}
+S^{(k)}_{1,\ldots,1} = \frac{(\Delta x)^k}{k!}, \quad \Delta x = x_n - x_1
+\label{eq:1d-collapse}
+\end{equation}
+
+All terms are deterministic functions of a single scalar $\Delta x$, rendering higher-order components informationally redundant. This degeneracy motivates embedding the path into a higher-dimensional space prior to signature computation.
+
+\subsubsection{2D Embedding and Signature Definition}
+
+Each chain $X = [n_0, n_1, \ldots, n_k]$ extracted from the MOVG is embedded into $\mathbb{R}^2$ via the time-value map:
+\begin{equation}
+\gamma : n_i \mapsto (t_i, y_i) = (n_i,\; Y[n_i])
+\label{eq:2d-embedding}
+\end{equation}
+
+This lifts the path into the time-amplitude plane, where non-trivial signed areas exist and iterated integrals carry geometric meaning. The depth-$N$ signature of the embedded path $\gamma$ is defined as:
+
+\begin{definition}[Depth-$N$ Signature]
+\label{def:signature}
+Let $\gamma : [t_1, t_n] \to \mathbb{R}^2$ be a piecewise-linear interpolation of the embedded chain. The depth-$N$ signature is the collection of iterated integrals
+\begin{equation}
+\mathrm{Sig}_N(\gamma) = \left\{ S^{(i_1, \ldots, i_k)} = \int_{t_1 \leq u_1 < \cdots < u_k \leq t_n} d\gamma^{i_1}_{u_1} \cdots\, d\gamma^{i_k}_{u_k} \;\middle|\; 1 \leq k \leq N,\; i_j \in \{1, 2\} \right\}
+\label{eq:signature-def}
+\end{equation}
+For $d{=}2$ and $N{=}3$, this yields $(2^4 - 1)/(2-1) = 15$ components.
+\end{definition}
+
+\subsubsection{Extracted Scalar Projections}
+
+Rather than utilising the full 15-term vector, three scalar projections are extracted per chain, each capturing a distinct geometric property of the path:
+
+\begin{equation}
+\begin{aligned}
+\texttt{sig}[2] &= S^{(2)} = \int dy = y(t_n) - y(t_1) && \text{(net amplitude change)} \\[4pt]
+\texttt{sig}[4] &= S^{(1,2)} = \int\!\!\int_{u_1 < u_2} dt\, dy && \text{(signed area / L\'{e}vy area analogue)} \\[4pt]
+\texttt{sig}[8] &= S^{(1,1,2)} = \int\!\!\int\!\!\int_{u_1 < u_2 < u_3} dt\, dt\, dy && \text{(time-weighted acceleration)}
+\end{aligned}
+\label{eq:sig-projections}
+\end{equation}
+
+The first-order term $\texttt{sig}[2]$ quantifies overall displacement. The second-order term $\texttt{sig}[4]$ measures the signed area enclosed between the path and the chord connecting its endpoints --- distinguishing concave from convex trajectories with identical net change. The third-order term $\texttt{sig}[8]$ captures temporal asymmetry: whether amplitude changes are concentrated early or late in the path. Together, these three projections provide a compact yet discriminative characterisation of each chain's geometry.
+
+\subsubsection{Aggregate and Expanded Signatures}
+
+Two modes of signature aggregation are employed across the chain families produced by decomposition:
+
+\begin{definition}[Aggregate Signature]
+\label{def:agg-sig}
+For a set of $m$ chains $\{X_1, \ldots, X_m\}$ decomposed at query node $s$, the \emph{aggregate signature} computes the mean of each scalar projection across all chains:
+\begin{equation}
+\bar{\sigma}_k = \frac{1}{m} \sum_{j=1}^{m} \texttt{sig}[k]_j, \quad k \in \{2, 4, 8\}
+\end{equation}
+This yields a single 3-dimensional descriptor summarising the typical chain geometry at $s$.
+\end{definition}
+
+\begin{definition}[Expanded Signature]
+\label{def:exp-sig}
+The \emph{expanded signature} retains all 15 components of the depth-3 signature for each chain, concatenated with distributional statistics (variance, skewness, kurtosis) across chains. This provides a higher-dimensional but more expressive representation.
+\end{definition}
+
+The aggregate form is employed for computational efficiency and downstream interpretability; the expanded form is reserved for settings where richer characterisation is required.
+
+\subsubsection{Worked Example (continued)}
+
+Returning to the decreasing chain $[4, 6, 7]$ from $Y = [3, 1, 4, 2, 5, 1, 3, 2]$, the 2D embedding produces $\gamma = [(4, 5),\, (6, 3),\, (7, 2)]$. The signature projections are:
+\begin{itemize}
+    \item $\texttt{sig}[2] = 2 - 5 = -3$ \quad (net descent of 3 units)
+    \item $\texttt{sig}[4] < 0$ \quad (path bows below the direct chord, indicating concavity)
+    \item $\texttt{sig}[8]$: sign and magnitude encode whether the descent accelerates or decelerates over time
+\end{itemize}
+
+These scalar values become features in the downstream machine learning pipeline. Crucially, each is traceable through the chain to specific nodes and timestamps in the original signal. This is the provenance that underpins the interpretability claim of the MOVG framework.
+
+\subsection{Baseline Preprocessing Methods}
+\label{sec:baselines}
+
+Three established feature extraction methods are employed as comparative baselines. Each is summarised below with attention to its representational assumptions and interpretability properties.
+
+\subsubsection{Fast Fourier Transform (FFT)}
+
+The discrete Fourier transform decomposes a length-$N$ signal into $N$ complex-valued spectral coefficients:
+\begin{equation}
+X_k = \sum_{n=0}^{N-1} x_n \, e^{-2\pi i k n / N}, \quad k = 0, 1, \ldots, N-1
+\label{eq:dft}
+\end{equation}
+
+Each coefficient $X_k$ encodes the amplitude $|X_k|$ and phase $\arg(X_k)$ of a sinusoidal component at frequency $k/N$. The fast Fourier transform computes Eq.~\ref{eq:dft} in $O(N \log N)$ time. As a feature extraction method, the amplitude spectrum is typically retained while phase information is discarded. This projection into the frequency domain identifies dominant periodicities but sacrifices temporal locality: the transform integrates over the entire window, providing no information about \emph{when} a given frequency component is active. Individual spectral coefficients lack direct structural provenance in the time domain.
+
+\subsubsection{Wavelet Decomposition}
+
+The discrete wavelet transform addresses the temporal locality limitation of FFT by decomposing a signal into coefficients localised in both time and scale. A mother wavelet $\psi(t)$ is scaled and translated to produce a family of basis functions:
+\begin{equation}
+\psi_{a,b}(t) = \frac{1}{\sqrt{a}}\,\psi\!\left(\frac{t - b}{a}\right)
+\label{eq:wavelet}
+\end{equation}
+
+where $a > 0$ controls scale (inversely related to frequency) and $b$ controls temporal position. Multiresolution analysis decomposes the signal into approximation and detail coefficients at successive dyadic scales, yielding a time-frequency representation. This provides finer temporal resolution at high frequencies and finer frequency resolution at low frequencies. However, the choice of mother wavelet and decomposition depth constitutes a \emph{basis commitment}: the representation is optimal only for signals whose morphology matches the chosen wavelet family. The resulting coefficients are not directly traceable to named structural properties of the signal.
+
+\subsubsection{catch22}
+
+The catch22 feature set comprises 22 canonical time series characteristics selected from an initial library of 4,791 features via a greedy forward selection procedure optimised for classification performance across 93 benchmark datasets. The features span distributional statistics (histogram modes, outlier measures), temporal autocorrelation (first minimum of autocorrelation, automutual information), successive differences (proportion exceeding a threshold, longest stretch of consecutive increases), and fluctuation scaling (detrended fluctuation analysis exponents). The set computes in $O(N^{1.16})$ and is designed to be maximally diverse: each feature captures a distinct dynamical property.
+
+From an interpretability standpoint, catch22 features are domain-agnostic statistical summaries. While individually computable and named, they lack structural provenance: a given feature value cannot be traced to specific temporal events or structural relationships within the signal. This contrasts with MOVG features, where each extracted quantity maps to identifiable nodes, chains, and hierarchy levels in the constructed graph, enabling a complete backtrace from prediction to raw signal.
+
+\section{Methodology}
+
+\subsection{Project Deliverables}
+\label{sec:deliverables}
+
+This project produced three deliverables. First, a formal algorithmic specification of the MOVG framework, comprising definitions, proofs, and pseudocode. This was accompanied by an installable Python package (13 modules, \texttt{pyproject.toml}, 45 unit tests). Second, API documentation for package usage for future research, in the RESTful API style (add references). Third, a preprocessing benchmark evaluating MOVG features against three established baselines across seven regression models, together with a post-inference interpretability chain enabling backtrace from model predictions to raw signal events, as well.
+
+\subsection{Feature Extraction Pipeline}
+\label{sec:feature-pipeline}
+
+The MOVG framework extracts 167 features per time series window, organised across 14 categories: path signatures (indices 0–14 plus log-signature norm), tree structure (depth, branching factor, number of roots/leaves/internals), node amplitude statistics at each hierarchy level, level-wise distributional summaries, degree distribution moments, temporal spacing statistics, edge counts, subtree sizes, graph-theoretic measures (diameter, density, clustering coefficient), spectral properties (algebraic connectivity, spectral radius), and standard visibility graph comparison metrics.
+
+\subsubsection{Feature Integrity}
+
+Of the 167 features, 12 belong to a raw window statistics category. 
+These are computed directly from the signal window and are not derived 
+from the MOVG graph. They were retained and reported separately to 
+quantify their contribution relative to the 155 structural features. 
+This separation prevents conflating graph-derived predictive power with 
+simple statistical baselines, since early experiments showed that 
+\texttt{win\_*} features created a near-trivial mapping for linear models 
+during flat signal phases, inflating GP and Ridge performance.
+
+The raw window features are:
+\begin{itemize}
+\item \texttt{win\_mean}, \texttt{win\_std}, \texttt{win\_rms}
+\item \texttt{win\_min}, \texttt{win\_max}, \texttt{win\_range}
+\item \texttt{win\_skew}, \texttt{win\_kurt}, \texttt{win\_peak\_to\_peak}
+\item \texttt{win\_crest\_factor}, \texttt{win\_n\_local\_max}, \texttt{win\_n\_local\_min}
+\end{itemize}
+
+\subsubsection{Dimensionality Reduction}
+
+The 155 structural features were reduced to 32 via a three-stage pipeline. First, features with absolute Pearson correlation below 0.30 with the target variable were discarded. Second, iterative variance inflation factor (VIF) screening removed features with VIF exceeding 5, eliminating multicollinearity. Third, domain-driven curation retained the most interpretable representatives from each MOVG category (e.g., preferring tree depth over redundant branching statistics). The resulting 32-feature set spans signatures, hierarchy depth, root/leaf amplitude statistics, and degree distribution moments.
+
+\subsubsection{Baseline Feature Sets}
+
+Three baseline feature sets were computed on identical windows for fair comparison: catch22 (22 statistical features), FFT (amplitude spectrum coefficients), and discrete wavelet transform (detail and approximation coefficients at dyadic scales). All feature sets share the same train/test splits and evaluation protocol.
+
+\subsection{Models and Evaluation}
+\label{sec:models-evaluation}
+
+Seven regression models were employed, spanning four learning paradigms: tree-based (XGBoost, LightGBM, Random Forest), kernel-based (SVR, Gaussian Process), linear (Ridge Regression), and instance-based (K-Nearest Neighbours). This diversity tests whether MOVG features benefit models uniformly or proportionally to their inability to discover structure independently from raw inputs.
+
+SVR was initially tuned with $C{=}0.1$, which produced near-constant predictions across all feature sets. The regularisation penalty dominated the loss, causing the model to ignore input features entirely. Re-tuning with higher $C$ values recovered meaningful predictions. Both configurations are reported to demonstrate the sensitivity of kernel methods to hyperparameter selection when operating on structural features.
+
+Evaluation followed an expanding-window walk-forward cross-validation protocol. The training set grows with each split while the test set advances forward in time, preventing data leakage. This design preserves temporal ordering and reflects realistic deployment conditions in which a model is periodically retrained as new data arrives. The expanding (rather than sliding) window was chosen because historical observations remain informative: discarding early data would sacrifice context that may improve generalisation. All four feature sets (MOVG-32, catch22, FFT, wavelet) share identical splits, targets, and evaluation metrics (RMSE, MAE) to ensure fair comparison.
+
+\subsection{Post-Inference Backtrace}
+\label{sec:backtrace}
+
+The central contribution of this work is not predictive performance but the ability to explain \emph{why} a model produced a given output. The backtrace procedure establishes a three-layer chain of provenance from a model prediction to identifiable events in the raw signal.
+
+At the first layer, SHAP (SHapley Additive exPlanations) attributes the prediction to individual MOVG features, yielding a ranked list of contributions per feature. At the second layer, each high-attribution feature is mapped to the MOVG graph structure that produced it — a specific chain, a set of nodes, or a hierarchy level. At the third layer, those graph elements are projected back onto the original time series via their stored time indices and amplitude values, identifying the precise temporal events that drove the prediction.
+
+Algorithm~\ref{alg:backtrace} formalises this procedure.
+
+\begin{algorithm}[H]
+\caption{Post-Inference Backtrace}
+\label{alg:backtrace}
+\begin{algorithmic}[1]
+\Require Trained model $\mathcal{M}$, input feature vector $\mathbf{x}$, MOVG structure $\mathcal{G}$, raw signal $Y$
+\Ensure Highlighted timestamps and amplitudes in $Y$
+\Function{Backtrace}{$\mathcal{M}, \mathbf{x}, \mathcal{G}, Y$}
+    \State $\hat{y} \gets \mathcal{M}.\text{predict}(\mathbf{x})$
+    \State $\boldsymbol{\phi} \gets \text{SHAP}(\mathcal{M}, \mathbf{x})$ \Comment{Per-feature attributions}
+    \State $F_k \gets \text{top-}k\text{ features by } |\phi_i|$
+    \For{$f \in F_k$}
+        \State $\mathcal{N}_f \gets \text{MapToNodes}(\mathcal{G}, f)$ \Comment{Graph nodes producing $f$}
+        \State $\mathcal{T}_f \gets \{(t_n,\, Y[t_n]) : n \in \mathcal{N}_f\}$ \Comment{Timestamps + amplitudes}
+    \EndFor
+    \State \Return $\{(f,\, \phi_f,\, \mathcal{T}_f) : f \in F_k\}$
+\EndFunction
+\end{algorithmic}
+\end{algorithm}
+
+
+The output is a set of annotated signal regions: for each influential feature, the practitioner sees which raw data points contributed to that feature's value and, via SHAP, how much that feature shifted the prediction. This contrasts with SHAP applied to spectral or statistical features, where an attribution to (for example) a Fourier coefficient or an autocorrelation statistic identifies \emph{what type} of property mattered but not \emph{which specific temporal events} produced it.
+%I AM LOSING MY SANITY
+% PLACEHOLDER: You draw the three-layer backtrace diagram
+% Layer 1: SHAP bar chart (feature → contribution)
+% Layer 2: MOVG tree with highlighted nodes/chains
+% Layer 3: Raw signal with highlighted timestamps
+\begin{figure}[H]
+    \centering
+    % [INSERT YOUR THREE-LAYER BACKTRACE DIAGRAM HERE]
+    \caption{Post-inference backtrace. Layer~1: SHAP attributes prediction to ranked features. Layer~2: each feature maps to specific MOVG nodes and chains. Layer~3: graph elements project onto the raw signal, identifying the temporal events driving the prediction.}
+    \label{fig:backtrace}
+\end{figure}
 
 \section{Results}
 
-Results should be presented in a clear and succinct way so that they can be easily interpreted and also supported by appropriate text which
-highlights the significant aspects of the results.
-
-If a design project has been undertaken the results will comprise measurements, observations and simulations which have been carried
-out in order to assess how closely the design correlates to its specification in terms of its functionality, performance, area, power
-dissipation, etc.
-
-In this section the results of your investigation or design are analysed and compared, if appropriate, to related work in the field.
-Again, it is also useful to reiterate the aims of the project so that your discussion can be put in context. What ensues thereafter depends upon
-the project. For example, it may include a comparison of:
-
-\begin{itemize}
-  \item Measured results with simulation data, or results outlined in related technical publications.
-  \item Results from different proposed solutions, different implementations of the same solution – advantages / disadvantages of each.
-  \item Design performance against its specification.
-\end{itemize}
-
-The discussion may also include a Retrospective Section where, considering the knowledge and experience you gained from the project,
-you may give a brief account of how you would have tackled the project differently.
-
-Suggestions for extending the work of the project can also be outlined in
-this section.
+\section{Discussion}
 
 \section{Conclusion}
 
-The conclusions should be very succinct and depending on the project may contain:
-
-\begin{itemize}
-  \item Statements on the deductions obtained from the results.
-  \item Comments on the extent to which the original aims of the project were fulfilled.
-  \item Novelty of the solutions proposed - merits and limitations.
-  \item Statement of potential applications.
-\end{itemize}
+\section{Constraints and Future Work}
 
 \section{References}
 
-The list of references follows immediately after the conclusions.
-Each reference should be cited somewhere in your dissertation, and
-there should be no citations that refer to references that cannot be found in the list.
-Use IEEE standard for referencing. 
-
-\section{Appendices}
-
-should be used for material that is relevant to the project but
-disrupts the flow of the main text, e.g.  detailed derivations,
-additional graphs, tables of results, program listings, etc.
-
-Need to add API design documentation for the MOVG code
-
-Need to add links for github repo and also pyPI package.
-
-Need to add all of the links and tables for planning this project.
-
-Need to test IEEE format for writing the report
-
-Need to add flowcharts for algorithm design. 
-
-Output examples of the MOVG code, including examples to show how the MOVG deals with edge cases, like missing values and 
-NaN values. We can also see how it deals with small and large datasets, without a GUI as well. 
-
-Need to include:
-
-\begin{itemize}
-  \item Flat trends,
-  \item Increasing trends (steady and sharp increases),
-  \item Decreasing trends (steady and sharp decreases),
-  \item Staircase trends, up and down,
-  \item Plateaus,
-  \item Missing values,
-  \item NaN values, 
-  \item Small datasets,
-  \item Large datasets,
-  \item Seasonal trends,
-  \item Periodic trends,
-  \item Random noise.
-  \item Applying AR or MA methods to the time series before applying the MOVG.
-  \item Applying smoothing methods to the time series before applying the MOVG.
-  \item Applying differencing methods to the time series before applying the MOVG.
-  \item Applying detrending methods to the time series before applying the MOVG.
-  \item Need to use two similar time series, but one with a slight variation, to show how the MOVG can pick up on small changes.
-  \item How clustering can be retained in the MOVG output.
-  \item How outliers can be retained in the MOVG output.
-  \item Multivariate time series examples and how the MOVG can be applied to them.
-  \item Comparison of MOVG outputs with standard visibility graph outputs for the same time series.
-  \item Then use with an actual ML model to show how it can be used for preprocessing.
-\end{itemize}
-
-\section{Detailed Write Up Plan}
-
-Get the IEEE format working for the report. IEEEtran seems to be the best package for this.
-
-\begin{enumerate}
-  \item Abstract
-  \item Introduction
-  \item Literature Review
-  \item Theoretical Background
-  
-  \begin{itemize}
-    \item Explain what a graph is mathematically, using the correct mathematical notation + source.
-    \item Explain what a time series is and how it can be used in a financial setting.
-    \item What is a visibility graph and where can it be used (applications plus original paper as a reference). 
-    \item Explain how a visibility graph can be used for time series applications and analysis.
-    \item Explain why we can use them as well. 
-    
-    \begin{enumerate}
-      \item Traversal/Partition is not possible due to the amount of edges and the nodes are connected. 
-      \item No clear traversal methods for a standard visibility graph. 
-      \item Cannot see the trends clearly for visibility graph.
-      \item Compare with MOVG as well. 
-    \end{enumerate}
-    
-    \item Need to explain what the Min-Max Heap is and how it works, including pseudocode and time complexity analysis.
-    \item Explain the operation of the Min-Max Heap (used to create a data structure from an array). 
-    \item Min-Max heap capabilities and how it can be improved and downsides (de/composition isn’t actually possible).
-    \item Need to explain signatures and how they work.
-    \item Explain what the outputs look like and how it can be fed into a model
-  \end{itemize}
-  \begin{itemize}
-  \item Start to explain how the MOVG works:
-
-    \begin{enumerate}
-      \item Talk about preprocessing capabilities and how it fits into the process of designing a machine learning model.
-      \item What the outputs are and how it can be fed into a model. 
-    \end{enumerate}
-
-  \item What problem does it aim to solve?
-  \item What are the possible applications - (Ideally financial applications)?
-  \end{itemize}
-
-\end{enumerate}
-
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=0.8\textwidth]{../images/test.png}
-    \caption{MOVG Diagram}
-    \label{fig:movg_diagram}
-\end{figure}
-
-
+\section{Appendix}
 
 \end{document}
