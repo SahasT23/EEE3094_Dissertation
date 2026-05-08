@@ -374,4 +374,4 @@ MIT. See `LICENSE`.
 
 If you use MOVG in academic work, please cite the dissertation:
 
-> Sahas \[surname\]. *Magnitude-Ordered Visibility Graphs for Interpretable Time Series Preprocessing*. MEng dissertation, Newcastle University, 2026.
+> Sahas Talasila. *Magnitude-Ordered Visibility Graphs for Interpretable Time Series Preprocessing*. BEng dissertation, Newcastle University, 2026.
